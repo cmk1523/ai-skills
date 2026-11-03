@@ -7,7 +7,7 @@ description: Extracts selectors (emails, phones, IP addresses, URLs, domains, MA
 
 Extract **selectors** from the given text: emails, phone numbers, IP addresses, URLs, domains, MAC addresses, IMEIs, IMSIs, social security numbers, credit card numbers, UUIDs, social handles, usernames, hashtags, license plates, license IDs, API keys, and any other explicit identifier that fits none of those types.
 
-Selectors are identifiers, not ordinary nouns. Return **only** the CSV as the assistant message. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+Selectors are identifiers, not ordinary nouns. Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
 
 **Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
 
@@ -24,13 +24,13 @@ Selectors are identifiers, not ordinary nouns. Return **only** the CSV as the as
 3. Copy each `entity` **verbatim** from the source. Keep the original spelling, capitalization, and internal punctuation and spacing. Do not rewrite, expand, abbreviate, translate, or otherwise normalize the `entity` value. Strip surrounding sentence punctuation that is not part of the selector (a trailing period or comma, or enclosing parentheses, brackets, or quotes). Keep punctuation that belongs to the selector itself, such as the parentheses in `(415) 555-0100`.
 4. Extract the selector as written. Do not split an email into a domain, or a URL into a host, domain, or path, unless that shorter selector also appears on its own in the text.
 5. Do not extract a person, place, organization, or event that appears only inside an email, email domain, or URL host. Extract the selector itself.
-6. Deduplicate case-insensitively on `entity`. Keep the first spelling that appears. Do not emit another row for a case-only variant. Spellings that differ by punctuation, spacing, or formatting each get their own row. Emit rows in order of first appearance.
+6. Deduplicate case-insensitively on `entity`. Keep the first spelling that appears. Do not emit another row for a case-only variant. Spellings that differ by punctuation, spacing, or formatting each get their own row. Emit rows in order of first appearance. Print those rows by following `format-as-csv/SKILL.md`.
 7. `selector type` is required. Use a specific type when one fits. If the value is clearly an identifier and no specific type fits, use `GENERIC`. If it is not clearly an identifier, do not emit the row.
 8. `description` is required. Write a short phrase for who or what the selector belongs to, using only what the source states. When the text assigns it to a person, use `the [kind] for [person name]`, such as `the phone number for Ada Lovelace`. Resolve a clear pronoun to that person. When the text names no owner, describe the role it does state, such as `the press contact phone number`. Do not invent a person, organization, or purpose. Do not copy the `entity` value into the description. Do not end the phrase with a period.
 
 ### Selector types
 
-`selector type` is exactly one of these unquoted values:
+`selector type` is exactly one of these scalar values:
 
 `EMAIL`, `PHONE`, `IP_ADDRESS`, `URL`, `DOMAIN`, `MAC_ADDRESS`, `IMEI`, `IMSI`, `SSN`, `CREDIT_CARD`, `UUID`, `HANDLE`, `USERNAME`, `HASHTAG`, `LICENSE_PLATE`, `LICENSE_ID`, `API_KEY`, `GENERIC`
 
@@ -59,22 +59,16 @@ License plates, license IDs, usernames, and other non-standard identifiers have 
 
 ## Output
 
-Print strict CSV in the reply. Required header, exact and unquoted:
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
 
-```
-entity,selector type,description
-```
+Column contract for that skill:
 
-- `entity`, `selector type`, and `description` are required. If any would be blank, do not emit the row.
-- `description` is a short phrase with no trailing period. Quote it when it contains a comma or a double quote.
-- Do not quote ordinary scalars. Quote a field only when it contains a comma or a double quote.
-- `selector type` is always an unquoted token from the allowed list.
-- Do not quote the header.
-- Escape an embedded double quote by doubling it (`"` → `""`) and quote that field.
-- Do not drop columns.
-- No whitespace-only values. A blank field is empty, not spaces.
-- Separate rows with `\n` (LF). End the last row with `\n`. Do not use `\r\n`.
-- Emit the header even when there are no selectors.
+- Header, exact and unquoted: `entity,selector type,description`. Emit it even when there are no selectors.
+- `entity`, `selector type`, and `description` are required scalars. If any would be blank, do not emit the row.
+- `description` is a short phrase with no trailing period.
+- `selector type` is one token from the allowed list.
+- Keep every column.
+- Emit rows in order of first appearance.
 
 ## Worked example
 
@@ -84,7 +78,7 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom. She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs, and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon. Follow @adalovelace and #AnalyticalEngine. Her username was ada_lovelace. The schedule is at https://example.com/press. Updates are posted on analyticalengine.org. Logged identifiers included SSN 078-05-1120, IMEI 490154203237518, IMSI 310150123456789, card 4111 1111 1111 1111, MAC 00:1A:2B:3C:4D:5E, and UUID 550e8400-e29b-41d4-a716-446655440000. Her license plate was ABC-1234, her driver's license was D1234567, and the booth API key was sk_test_analytical_engine. Her account number was 8839102. Call again at (415) 555-0100 or PRESS@example.com.
 ```
 
-Required output (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
 
 ```
 entity,selector type,description
@@ -123,7 +117,7 @@ entity,selector type,description
 
 Check silently, then print only the CSV:
 
-- The header is exactly `entity,selector type,description`, and the text parses as CSV.
+- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,selector type,description`.
 - Every `description` is a non-empty phrase with no trailing period. It names an owner only when the source assigns one.
 - Case-only variants share one row (first spelling). Forms that differ by more than case each have a row, in order of first appearance. `entity` is the verbatim source spelling, without surrounding sentence punctuation.
 - `selector type` is one allowed token and is never blank.

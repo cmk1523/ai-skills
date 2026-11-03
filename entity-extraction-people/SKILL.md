@@ -7,7 +7,7 @@ description: Extracts people from text into strict one-row-per-person CSV. Uses 
 
 Extract **people** from the given text. Use only names and titles written in that text. Do not add people, aliases, or titles from outside knowledge.
 
-Return **only** the CSV as the assistant message. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
 
 **Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
 
@@ -25,7 +25,7 @@ Return **only** the CSV as the assistant message. Do not add prose, markdown fen
 4. Do not extract a person merely because their name is embedded in another name. `Washington University` is not a person named `Washington`. Extract the person only when the text refers to them as a person.
 5. Do not extract a person who appears only inside an email address, email domain, or URL host unless the text also refers to them as a person.
 6. Group mentions of the same person onto one row (see below). If two full names might be the same person and the text does not show it, emit two rows.
-7. Build `entity`, `synonyms`, and `title` from the grouped mentions, then emit rows in order of each person's first appearance.
+7. Build `entity`, `synonyms`, and `title` from the grouped mentions, then emit rows in order of each person's first appearance. Print those rows by following `format-as-csv/SKILL.md`.
 
 ## Same person
 
@@ -51,7 +51,7 @@ A title that governs a list applies to each named person. If it is plural only b
 Strip titles, possessives, and sentence punctuation first (rules below). What remains is copied verbatim: original spelling, capitalization, and internal punctuation. Do not translate, expand, abbreviate, or reorder it.
 
 - **`entity`** is the fullest attested form: the one with the most name tokens (given names, initials, surname, generational suffix). A quoted nickname does not count. If two forms are equally full, use the one that appears first. Keep that occurrence's casing.
-- **`synonyms`** are the other spellings of that person, in order of first appearance. Do not include the entity string. Do not add aliases the source never writes.
+- **`synonyms`** are the other spellings of that person. Do not include the entity string. Do not add aliases the source never writes. Emit name-forms first, then aliases. Name-forms are unique subsets, unique initialisms, and comma inversions. Aliases are explicit aliases and quoted nicknames. Within each group, keep first-appearance order. `Marcus Vance`, also called `"The Hound,"` then later `Vance` → `"Vance;The Hound"`.
 - Deduplicate case-insensitively. Keep the first casing.
 - Wrapping punctuation does not make a new spelling. `Ada`, `Ada.`, and `"Ada"` are one spelling; keep `Ada`. Periods inside initials are part of the spelling: `J.F.K.` and `JFK` are different.
 - An inverted comma-form (`Lovelace, Ada`) is a different spelling. It stays a synonym unless it is the fullest form chosen as `entity`.
@@ -89,38 +89,36 @@ Put the stripped title in `title`, plus an office stated for that person (`the C
 
 Do **not** put incidental descriptions in `title`: `a mathematician`, `a resident of London`, `author of X`, `activist`, `mother of three`.
 
+- An appositive office is a title even when it starts with `a`, `an`, or `the`, and even with a status word in front (`former`, `acting`, `interim`, `then`). Store the office only: drop the article and the status word. End the title before `who`, `at`, or `of` when that starts a biography, employer, or affiliation.
+- Store `Mr.`, `Mrs.`, `Ms.`, `Miss`, and `Mx.` only when that person has no rank, professional suffix, or job. When one of those is present, strip the courtesy title from the name and leave it out of `title`.
+
 Merge titles from every mention of that person onto the one row. Dedupe case-insensitively and keep the first spelling. Order honorifics and professional suffixes by appearance, then job roles by appearance. Do not put a title in `synonyms`. Do not invent a title.
 
-One title is an unquoted scalar (`Dr.`). Several titles are one quoted semicolon list with no spaces (`"PhD;CEO"`).
+One title is a scalar (`Dr.`). Several titles are a list with no spaces around the semicolons (`PhD` and `CEO` → `PhD;CEO`). `format-as-csv/SKILL.md` quotes that list.
 
 ## Output
 
-Print strict CSV in the reply. Required header, exact and unquoted:
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
 
-```
-entity,synonyms,title
-```
+Column contract for that skill:
 
-- `entity` is required. If it would be blank, do not emit the row.
-- Unknown optional fields are empty. Do not write `UNKNOWN`, `N/A`, `null`, `""`, or spaces.
-- No spaces before or after a comma that separates columns. Keep spaces that are part of a value (`Smith, John`). No spaces around semicolons inside a list.
-- Do not quote ordinary scalars. Quote a field only when it is a list (including a one-item list), when it contains a comma, double quote, or newline, or when it starts with `=`, `+`, `-`, or `@`.
-- `synonyms` is quoted when it has one or more items (`"Ada"`, `"Lovelace;Ada"`) and blank when it has none.
-- A one-item `title` is unquoted unless it itself contains a comma, quote, or newline. A multi-title `title` is quoted.
-- Escape an embedded double quote by doubling it (`"` → `""`) and quote that field.
-- Do not drop columns. A blank `title` is a trailing comma: `Ada Lovelace,"Lovelace;Ada",`
-- Separate rows with `\n` (LF). End the last row with `\n`. Do not use `\r\n`.
-- Emit the header even when there are no people.
+- Header, exact and unquoted: `entity,synonyms,title`. Emit it even when there are no people.
+- `entity` is a required scalar. If it would be blank, do not emit the row.
+- `synonyms` is a list column. A person with no synonyms has an empty cell.
+- One `title` is a scalar. Several titles are a list.
+- Keep every column. An empty `title` is an empty last field: `Ada Lovelace,"Lovelace;Ada",`
+- Unknown optional fields are empty.
+- Emit rows in order of each person's first appearance.
 
 ## Worked example
 
 Source text:
 
 ```
-On March 12, 2024, Dr. Martin Luther King Jr. spoke in Washington. Stephen King signed books the same day. Robert "Bob" Smith arrived with Jane Smith, PhD, the CEO, and John Smith. Smith waved, and Bob waved back. The badge read "Smith, John". Mr. and Mrs. John Smith hosted Senators Warren and Booker. Lady Gaga performed. Lovelace's notes describe Ada Lovelace (also called Ada). Washington University sent no one. She thanked the crew.
+On March 12, 2024, Dr. Martin Luther King Jr. spoke in Washington. Stephen King signed books the same day. Robert "Bob" Smith arrived with Jane Smith, PhD, the CEO, and John Smith. Smith waved, and Bob waved back. The badge read "Smith, John". Mr. and Mrs. John Smith hosted Senators Warren and Booker. Lady Gaga performed. Lovelace's notes describe Ada Lovelace (also called Ada). Washington University sent no one. Marcus Vance, also called "The Hound," arrived after that. Vance left. She thanked the crew.
 ```
 
-Required output (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
 
 ```
 entity,synonyms,title
@@ -133,9 +131,10 @@ Warren,,Senator
 Booker,,Senator
 Lady Gaga,,
 Ada Lovelace,"Lovelace;Ada",
+Marcus Vance,"Vance;The Hound",
 ```
 
-`Dr.` is stripped and `Jr.` stays. `King` in both King names is a surname. `Bob` is the quoted nickname, then a later mention of the same person. Bare `Smith` matches three people, so it is dropped. `Smith, John` keeps its internal space and is a comma inversion of `John Smith`, not a new person. `Mrs.` names no one. `Senators` is stored as `Senator` on each named person. `Lady Gaga` stays intact. `Lovelace's` is the possessive of `Ada Lovelace`; `Ada` is an explicit alias. `Washington`, `Washington University`, `She`, and `the crew` are not people rows. `PhD` and `CEO` are titles; a loose description such as `a mathematician` would not be.
+`Dr.` is stripped and `Jr.` stays. `King` in both King names is a surname. `Bob` is the quoted nickname, then a later mention of the same person. Bare `Smith` matches three people, so it is dropped. `Smith, John` keeps its internal space and is a comma inversion of `John Smith`, not a new person. `Mrs.` names no one. `Senators` is stored as `Senator` on each named person. `Lady Gaga` stays intact. `Lovelace's` is the possessive of `Ada Lovelace`; `Ada` is an explicit alias, so the name-form `Lovelace` comes before it. `Vance` is a name-form and `The Hound` is an alias, so `Vance` comes first even though the nickname is written first. `Washington`, `Washington University`, `She`, and `the crew` are not people rows. `PhD` and `CEO` are titles; a loose description such as `a mathematician` would not be.
 
 ## Empty input
 
@@ -149,9 +148,9 @@ entity,synonyms,title
 
 Check silently, then print only the CSV:
 
-- The header is exactly `entity,synonyms,title`, there are no spaces beside column commas, and the text parses as CSV.
+- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,synonyms,title`.
 - One row per person, in order of first appearance. `entity` is the fullest attested name, not the first short form.
-- No synonym repeats `entity`. No functioning title remains on `entity`. No incidental description is in `title`.
+- No synonym repeats `entity`. Synonyms list name-forms before aliases, and each group is in first-appearance order. No functioning title remains on `entity`. No incidental description is in `title`.
 - No `UNKNOWN` or other sentinel. Empty optional fields are empty.
 - Ambiguous short forms and unnamed people are absent.
 

@@ -7,7 +7,7 @@ description: Extracts places from text into strict CSV with entity, synonyms, co
 
 Extract **places** from the given text: countries, states, provinces, regions, cities, districts, and named geographic features (rivers, mountains, lakes, and similar).
 
-Return **only** the CSV as the assistant message. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
 
 **Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
 
@@ -26,7 +26,7 @@ Return **only** the CSV as the assistant message. Do not add prose, markdown fen
 5. Do not extract postal or ZIP codes, and do not add a column for them.
 6. Copy each `entity` **verbatim** from the source. Keep the original spelling, capitalization, punctuation, and spacing. Do not rewrite, expand, abbreviate, translate, or otherwise normalize the `entity` value.
 7. Emit one row per distinct place. Keep the first verbatim mention as `entity`. Deduplicate case-insensitively when the same spelling appears again; a case-only variant is not a synonym. If the same name refers to two different places in the same text (for example `London, Ontario` and `London, England`), emit a row for each distinct place.
-8. Emit rows in order of first appearance.
+8. Emit rows in order of first appearance. Print those rows by following `format-as-csv/SKILL.md`.
 9. Apply the synonym rules below. Extract `synonyms` **only** from the source text, never from external knowledge. Do not emit separate rows for synonyms.
 
 ### Location stacks
@@ -37,7 +37,7 @@ When the text names one city as `City, Region, Country` (for example `London, En
 - Emit the country as its own row whenever the country is written in the text (including inside the stack, unlike the region; for example `United Kingdom` or `France`).
 - Do not emit the region as its own row when it appears only inside a city stack. It belongs in the city row's `state`.
 - Emit the region when the text also uses it as a place on its own, or when the stack is `Region, Country` with no city (for example `Ontario, Canada` emits both an `Ontario` row and a `Canada` row).
-- Exception: `Washington, D.C.` is a single compound place name, not a two-part stack. Its verbatim `entity` is `Washington, D.C.` (quoted in CSV as `"Washington, D.C."`), with `country` = `United States`, `state` = `District of Columbia`, and `city` = `Washington`.
+- Exception: `Washington, D.C.` is a single compound place name, not a two-part stack. Its verbatim `entity` is `Washington, D.C.`, with `country` = `United States`, `state` = `District of Columbia`, and `city` = `Washington`. `format-as-csv/SKILL.md` quotes the entity because the name contains a comma.
 
 A separate mention is its own row even if another row already uses that name as a geo value. `Washington, D.C. in the US` is a city row and a `US` row.
 
@@ -65,23 +65,17 @@ Fill `country`, `state`, and `city` from the text when it gives them, and from u
 
 ## Output
 
-Print strict CSV in the reply. Required header, exact and unquoted:
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
 
-```
-entity,synonyms,country,state,city
-```
+Column contract for that skill:
 
-- `entity` is required. If it would be blank, do not emit the row.
-- Unknown optional fields are empty. Do not write a sentinel.
-- Do not quote ordinary scalars. Quote a field only when it is a list (including a one-item list) or when it contains a comma or double quote.
-- `synonyms` is one quoted field of semicolon-separated items with no spaces around the semicolon (`"UK"`, `"Washington DC;DC"`), ordered by first appearance in the source text and deduplicated case-insensitively. If there are no synonyms, leave it blank and unquoted.
-- Quote a geo value or an entity only when that value contains a comma (`"Washington, D.C."`) or a double quote.
-- Do not quote the header.
-- Escape an embedded double quote by doubling it (`"` → `""`) and quote that field.
-- Do not drop columns. Blank fields stay in place: `London,,United Kingdom,England,London` and `Amazon,,,,`.
-- No whitespace-only values. A blank field is empty, not spaces.
-- Separate rows with `\n` (LF). End the last row with `\n`. Do not use `\r\n`.
-- Emit the header even when there are no places.
+- Header, exact and unquoted: `entity,synonyms,country,state,city`. Emit it even when there are no places.
+- `entity` is a required scalar. If it would be blank, do not emit the row.
+- `synonyms` is a list column, ordered by first appearance in the source text and deduplicated case-insensitively. A place with no synonyms has an empty cell.
+- `country`, `state`, and `city` are scalars.
+- Keep every column. Blank fields stay in place: `London,,United Kingdom,England,London` and `Amazon,,,,`
+- Unknown optional fields are empty.
+- Emit rows in order of first appearance.
 
 ## Worked example
 
@@ -91,7 +85,7 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom (UK). She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs, and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon.
 ```
 
-Required output (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
 
 ```
 entity,synonyms,country,state,city
@@ -116,7 +110,7 @@ entity,synonyms,country,state,city
 
 Check silently, then print only the CSV:
 
-- The header is exactly `entity,synonyms,country,state,city`, and the text parses as CSV.
+- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,synonyms,country,state,city`.
 - One row per distinct place, in order of first appearance. `entity` is the first verbatim source spelling.
 - `synonyms` contains only alternate names/acronyms for that place that actually appear in the source text (never from external knowledge), never repeats `entity`, and those synonyms do not get their own rows.
 - `country`, `state`, and `city` are filled from the text and from unambiguous world knowledge given the context. Empty fields are empty.

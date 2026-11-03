@@ -7,7 +7,7 @@ description: Extracts organizations from text into strict CSV with entity and sy
 
 Extract **organizations** from the given text: companies, agencies, universities, nonprofits, government bodies, teams, and other named institutions.
 
-Return **only** the CSV as the assistant message. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
 
 **Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
 
@@ -25,9 +25,9 @@ Return **only** the CSV as the assistant message. Do not add prose, markdown fen
 4. Do not extract a nested name merely because it sits inside an organization name. `University of Cambridge` is one organization. `Cambridge` is not a second organization unless the text also refers to it as an organization.
 5. Do not extract an organization that appears only inside an email address, email domain, or URL host unless the text also refers to it as an organization.
 6. Copy each `entity` **verbatim** from the source. Keep the original spelling, capitalization, punctuation, and spacing. Do not rewrite, expand, abbreviate, translate, or otherwise normalize the `entity` value. Strip grammatical possessives (`'s`, `’s`) attached to a mention unless the possessive is part of the organization's proper name (extract `NASA` from `NASA's budget`, but keep `McDonald's`).
-7. Organization legal endings stay on the name. `Inc.`, `Corp.`, `LLC`, `Ltd.`, and `GmbH` are part of the entity, not titles to strip. If the name contains a comma, quote the field (`"ACME Labs, Inc."`).
+7. Organization legal endings stay on the name. `Inc.`, `Corp.`, `LLC`, `Ltd.`, and `GmbH` are part of the entity, not titles to strip. A comma inside the name stays on the entity (`ACME Labs, Inc.`). `format-as-csv/SKILL.md` quotes that field.
 8. Emit one row per distinct organization, using the first verbatim mention in the source as `entity`. Deduplicate case-insensitively on `entity`; a case-only variant is not a synonym. Record other distinct proper names, acronyms, expansions, or aliases for the same organization that appear in the source text in `synonyms` rather than emitting extra rows.
-9. Emit rows in order of first appearance.
+9. Emit rows in order of first appearance. Print those rows by following `format-as-csv/SKILL.md`.
 10. Apply the synonym rules below. Extract `synonyms` **only** from the source text, never from external knowledge. Do not emit separate rows for synonyms.
 
 ### Verbatim names, acronyms, and text-only synonyms
@@ -41,23 +41,16 @@ Return **only** the CSV as the assistant message. Do not add prose, markdown fen
 
 ## Output
 
-Print strict CSV in the reply. Required header, exact and unquoted:
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
 
-```
-entity,synonyms
-```
+Column contract for that skill:
 
-- `entity` is required. If it would be blank, do not emit the row.
-- Unknown optional fields are empty. Do not write `UNKNOWN`, `N/A`, `null`, `""`, or spaces.
-- Do not quote ordinary scalars. Quote a field only when it is a list (including a one-item list) or when it contains a comma or double quote.
-- `synonyms` is one quoted field of semicolon-separated items with no spaces around the semicolon (`"NASA"`, `"IBM;Big Blue"`), ordered by first appearance in the source text and deduplicated case-insensitively. If there are no synonyms in the source text, leave it blank and unquoted.
-- Quote an `entity` only when that value contains a comma or double quote (`"ACME Labs, Inc."`).
-- Do not quote the header.
-- Escape an embedded double quote by doubling it (`"` → `""`) and quote that field.
-- Do not drop columns. A blank `synonyms` field is a trailing comma: `ACME Labs,`
-- No whitespace-only values. A blank field is empty, not spaces.
-- Separate rows with `\n` (LF). End the last row with `\n`. Do not use `\r\n`.
-- Emit the header even when there are no organizations.
+- Header, exact and unquoted: `entity,synonyms`. Emit it even when there are no organizations.
+- `entity` is a required scalar. If it would be blank, do not emit the row.
+- `synonyms` is a list column, ordered by first appearance in the source text and deduplicated case-insensitively. An organization with no synonyms has an empty cell.
+- Keep every column. An empty `synonyms` is an empty last field: `ACME Labs,`
+- Unknown optional fields are empty.
+- Emit rows in order of first appearance.
 - Do not emit `PEOPLE`, `PLACES`, `ORGANIZATIONS`, `EVENTS`, `SELECTORS`, or a `type` column. This skill is the organizations table only.
 
 ## Worked example
@@ -68,7 +61,7 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom. She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs (ACME), and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon. Logged identifiers included SSN 078-05-1120, IMEI 490154203237518, and MAC 00:1A:2B:3C:4D:5E.
 ```
 
-Required output (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
 
 ```
 entity,synonyms
@@ -91,7 +84,7 @@ entity,synonyms
 
 Check silently, then print only the CSV:
 
-- The header is exactly `entity,synonyms`, and the text parses as CSV.
+- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,synonyms`.
 - One row per distinct organization, in order of first appearance. `entity` is the first verbatim source spelling, including legal endings.
 - `synonyms` contains only alternate names, acronyms, or expansions for that organization that actually appear in the source text (never from external knowledge), never repeats `entity`, and those synonyms do not get their own rows.
 - No `UNKNOWN` or other sentinel. Empty optional fields are empty.
