@@ -1,5 +1,5 @@
 ---
-name: entity-extraction-selectors
+name: extract-selectors
 description: Extracts selectors (emails, phones, IP addresses, URLs, domains, MAC addresses, IMEIs, IMSIs, SSNs, credit card numbers, UUIDs, handles, usernames, hashtags, license plates, license IDs, API keys, and other labeled identifiers) from text into strict CSV, with a description of who or what each selector belongs to. Use when the user asks to extract selectors or identifiers.
 ---
 
