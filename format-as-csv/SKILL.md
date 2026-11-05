@@ -28,7 +28,7 @@ Return **only** the raw CSV as the assistant message:
 ## Cells & Quoting
 
 - **Empty / missing values:** Write nothing (`a,,c` or `a,b,`). Never write `null`, `None`, `N/A`, `UNKNOWN`, or `""`. (A whitespace-only string is non-empty data; quote it.)
-- **Scalars:** Leave unquoted unless the value contains a comma (`,`), double quote (`"`), line break (`\n` or `\r`), or leading/trailing whitespace.
+- **Scalars:** Leave unquoted unless the value contains a comma (`,`), double quote (`"`), single quote (`'`), line break (`\n` or `\r`), or leading/trailing whitespace. A single quote does not need further escaping; wrap the whole cell in `"` (`O'Brien` → `"O'Brien"`). Apply this to every field, including the header.
 - **Lists / arrays:** Drop empty or `null` items, escape any literal `;` inside an item as `;;`, join items with `;` (no spaces around `;`), and **always quote the cell**—even for a single item (`"Ada"`, `"Lovelace;Ada"`, `"a;;b;c"`). An empty list is an empty unquoted cell. Treat a single value as a scalar unless the input provides it as an array/list or the user defines the column as a list.
 - **Escaping:** Double any embedded double quote (`"` → `""`) and wrap the cell in `"`. Never use backslash escapes (`\"`, `\n`, `\uXXXX`) or HTML entities. Keep literal line breaks inside the quoted cell.
 - **Other JSON types:** Booleans as `true` or `false`; nested objects as compact single-line JSON, quoted under the scalar rules.
@@ -41,6 +41,7 @@ Input records (`header: name,aliases,city,note,score` where `aliases` is a list)
 3. Name `Smith, John`; city `Boston`
 4. Name `Robert "Bob" Smith`; aliases `["Bob"]`
 5. Name `=total`; note `=sum`
+6. Name `O'Brien`; city `Dublin`
 
 Required output (raw text in the reply, no code fence):
 
@@ -50,4 +51,5 @@ Jane Smith,,,"CEO, acting",
 "Smith, John",,Boston,,
 "Robert ""Bob""Smith","Bob",,,
 =total,,,=sum,
+"O'Brien",,Dublin,,
 
