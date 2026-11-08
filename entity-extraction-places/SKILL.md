@@ -65,13 +65,13 @@ Fill `country`, `state`, and `city` from the text when it gives them, and from u
 
 ## Output
 
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
 
 Column contract for that skill:
 
 - Header, exact and unquoted: `entity,synonyms,country,state,city`. Emit it even when there are no places.
 - `entity` is a required scalar. If it would be blank, do not emit the row.
-- `synonyms` is a list column, ordered by first appearance in the source text and deduplicated case-insensitively. A place with no synonyms has an empty cell.
+- `synonyms` is one cell, ordered by first appearance in the source text and deduplicated case-insensitively. A place with no synonyms has an empty cell. Several names are joined with `;` and no spaces. Quote that cell only when `format-as-csv/SKILL.md` requires it.
 - `country`, `state`, and `city` are scalars.
 - Keep every column. Blank fields stay in place: `London,,United Kingdom,England,London` and `Amazon,,,,`
 - Unknown optional fields are empty.
@@ -85,12 +85,12 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom (UK). She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs, and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon.
 ```
 
-Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
 
 ```
 entity,synonyms,country,state,city
 London,,United Kingdom,England,London
-United Kingdom,"UK",United Kingdom,,
+United Kingdom,UK,United Kingdom,,
 "Washington, D.C.",,United States,District of Columbia,Washington
 US,,United States,,
 Amazon,,,,

@@ -51,7 +51,7 @@ A title that governs a list applies to each named person. If it is plural only b
 Strip titles, possessives, and sentence punctuation first (rules below). What remains is copied verbatim: original spelling, capitalization, and internal punctuation. Do not translate, expand, abbreviate, or reorder it.
 
 - **`entity`** is the fullest attested form: the one with the most name tokens (given names, initials, surname, generational suffix). A quoted nickname does not count. If two forms are equally full, use the one that appears first. Keep that occurrence's casing.
-- **`synonyms`** are the other spellings of that person. Do not include the entity string. Do not add aliases the source never writes. Emit name-forms first, then aliases. Name-forms are unique subsets, unique initialisms, and comma inversions. Aliases are explicit aliases and quoted nicknames. Within each group, keep first-appearance order. `Marcus Vance`, also called `"The Hound,"` then later `Vance` → `"Vance;The Hound"`.
+- **`synonyms`** are the other spellings of that person. Do not include the entity string. Do not add aliases the source never writes. Emit name-forms first, then aliases. Name-forms are unique subsets, unique initialisms, and comma inversions. Aliases are explicit aliases and quoted nicknames. Within each group, keep first-appearance order. `Marcus Vance`, also called `"The Hound,"` then later `Vance` → `Vance;The Hound`.
 - Deduplicate case-insensitively. Keep the first casing.
 - Wrapping punctuation does not make a new spelling. `Ada`, `Ada.`, and `"Ada"` are one spelling; keep `Ada`. Periods inside initials are part of the spelling: `J.F.K.` and `JFK` are different.
 - An inverted comma-form (`Lovelace, Ada`) is a different spelling. It stays a synonym unless it is the fullest form chosen as `entity`.
@@ -94,19 +94,19 @@ Do **not** put incidental descriptions in `title`: `a mathematician`, `a residen
 
 Merge titles from every mention of that person onto the one row. Dedupe case-insensitively and keep the first spelling. Order honorifics and professional suffixes by appearance, then job roles by appearance. Do not put a title in `synonyms`. Do not invent a title.
 
-One title is a scalar (`Dr.`). Several titles are a list with no spaces around the semicolons (`PhD` and `CEO` → `PhD;CEO`). `format-as-csv/SKILL.md` quotes that list.
+One title is a scalar (`Dr.`). Several titles are one cell joined with `;` and no spaces (`PhD` and `CEO` → `PhD;CEO`). Quote that cell only when `format-as-csv/SKILL.md` requires it.
 
 ## Output
 
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
 
 Column contract for that skill:
 
 - Header, exact and unquoted: `entity,synonyms,title`. Emit it even when there are no people.
 - `entity` is a required scalar. If it would be blank, do not emit the row.
-- `synonyms` is a list column. A person with no synonyms has an empty cell.
-- One `title` is a scalar. Several titles are a list.
-- Keep every column. An empty `title` is an empty last field: `Ada Lovelace,"Lovelace;Ada",`
+- `synonyms` is one cell. A person with no synonyms has an empty cell. Several names are joined with `;` and no spaces, name-forms before aliases. Quote that cell only when `format-as-csv/SKILL.md` requires it.
+- One `title` is that title's text. Several titles are one cell joined with `;` and no spaces.
+- Keep every column. An empty `title` is an empty last field: `Ada Lovelace,Lovelace;Ada,`
 - Unknown optional fields are empty.
 - Emit rows in order of each person's first appearance.
 
@@ -118,20 +118,20 @@ Source text:
 On March 12, 2024, Dr. Martin Luther King Jr. spoke in Washington. Stephen King signed books the same day. Robert "Bob" Smith arrived with Jane Smith, PhD, the CEO, and John Smith. Smith waved, and Bob waved back. The badge read "Smith, John". Mr. and Mrs. John Smith hosted Senators Warren and Booker. Lady Gaga performed. Lovelace's notes describe Ada Lovelace (also called Ada). Washington University sent no one. Marcus Vance, also called "The Hound," arrived after that. Vance left. She thanked the crew.
 ```
 
-Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
 
 ```
 entity,synonyms,title
 Martin Luther King Jr.,,Dr.
 Stephen King,,
-Robert Smith,"Bob",
-Jane Smith,,"PhD;CEO"
+Robert Smith,Bob,
+Jane Smith,,PhD;CEO
 John Smith,"Smith, John",Mr.
 Warren,,Senator
 Booker,,Senator
 Lady Gaga,,
-Ada Lovelace,"Lovelace;Ada",
-Marcus Vance,"Vance;The Hound",
+Ada Lovelace,Lovelace;Ada,
+Marcus Vance,Vance;The Hound,
 ```
 
 `Dr.` is stripped and `Jr.` stays. `King` in both King names is a surname. `Bob` is the quoted nickname, then a later mention of the same person. Bare `Smith` matches three people, so it is dropped. `Smith, John` keeps its internal space and is a comma inversion of `John Smith`, not a new person. `Mrs.` names no one. `Senators` is stored as `Senator` on each named person. `Lady Gaga` stays intact. `Lovelace's` is the possessive of `Ada Lovelace`; `Ada` is an explicit alias, so the name-form `Lovelace` comes before it. `Vance` is a name-form and `The Hound` is an alias, so `Vance` comes first even though the nickname is written first. `Washington`, `Washington University`, `She`, and `the crew` are not people rows. `PhD` and `CEO` are titles; a loose description such as `a mathematician` would not be.

@@ -59,7 +59,7 @@ License plates, license IDs, usernames, and other non-standard identifiers have 
 
 ## Output
 
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
 
 Column contract for that skill:
 
@@ -78,7 +78,7 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom. She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs, and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon. Follow @adalovelace and #AnalyticalEngine. Her username was ada_lovelace. The schedule is at https://example.com/press. Updates are posted on analyticalengine.org. Logged identifiers included SSN 078-05-1120, IMEI 490154203237518, IMSI 310150123456789, card 4111 1111 1111 1111, MAC 00:1A:2B:3C:4D:5E, and UUID 550e8400-e29b-41d4-a716-446655440000. Her license plate was ABC-1234, her driver's license was D1234567, and the booth API key was sk_test_analytical_engine. Her account number was 8839102. Call again at (415) 555-0100 or PRESS@example.com.
 ```
 
-Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
 
 ```
 entity,selector type,description

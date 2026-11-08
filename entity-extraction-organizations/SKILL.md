@@ -41,13 +41,13 @@ Return **only** the CSV as the assistant message, printed by following `format-a
 
 ## Output
 
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, list joining, semicolon escaping, and quote escaping. **Do not write the CSV to disk.**
+Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
 
 Column contract for that skill:
 
 - Header, exact and unquoted: `entity,synonyms`. Emit it even when there are no organizations.
 - `entity` is a required scalar. If it would be blank, do not emit the row.
-- `synonyms` is a list column, ordered by first appearance in the source text and deduplicated case-insensitively. An organization with no synonyms has an empty cell.
+- `synonyms` is one cell, ordered by first appearance in the source text and deduplicated case-insensitively. An organization with no synonyms has an empty cell. Several names are joined with `;` and no spaces. Quote that cell only when `format-as-csv/SKILL.md` requires it.
 - Keep every column. An empty `synonyms` is an empty last field: `ACME Labs,`
 - Unknown optional fields are empty.
 - Emit rows in order of first appearance.
@@ -61,12 +61,12 @@ Source text:
 On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom. She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs (ACME), and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon. Logged identifiers included SSN 078-05-1120, IMEI 490154203237518, and MAC 00:1A:2B:3C:4D:5E.
 ```
 
-Required output, printed by `format-as-csv/SKILL.md` (each line ended by `\n`, including after the last row):
+Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
 
 ```
 entity,synonyms
 NASA,
-ACME Labs,"ACME"
+ACME Labs,ACME
 Amazon,
 ```
 
