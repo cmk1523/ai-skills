@@ -1,6 +1,6 @@
 ---
 name: ai-failure-diagnostician
-description: Diagnoses why an AI output was wrong, off-target, or just not good enough. Given a task, the prompt, and the output, it checks four properties of generative AI (next token prediction, knowledge, working memory, steerability) plus fine-tuning habits (sycophancy, verbosity, overcaution, loose confidence), names the pair of properties that most likely collided, and gives a targeted fix and a quick test to confirm. Use when the user asks to diagnose, explain, or troubleshoot why an AI answer failed, hallucinated, ignored instructions, drifted, got worse over a long chat, or was too long or hedged, or asks how to fix a failing prompt or workflow. Skip when the user is simply correcting you mid-task and wants the work redone rather than a diagnosis.
+description: Diagnoses why an AI output was wrong, off-target, or just not good enough. Given a task, the prompt, and the output, it checks four properties of generative AI (next token prediction, knowledge, working memory, steerability) plus fine-tuning habits (sycophancy, verbosity, overcaution, loose confidence), names the pair of properties that most likely collided, and gives a targeted fix and a quick test to confirm. Use when the user complains the AI is not fulfilling their needs, or asks to diagnose, explain, or troubleshoot why an AI answer failed, hallucinated, ignored instructions, drifted, got worse over a long chat or over time, or was too long or hedged, or asks how to improve a prompt or fix a failing prompt or workflow. Skip when the user is simply correcting you mid-task and wants the work redone rather than a diagnosis.
 ---
 
 # AI Failure Diagnostician
@@ -14,6 +14,36 @@ Generative AI is a next-token predictor that was later fine-tuned into an assist
 Most real failures are **two properties meeting**, not one. The question is not "what broke?" but "which two things collided?" Naming the pair makes the fix obvious.
 
 This is a diagnosis from outside the model. You cannot see inside it, so every conclusion is a hypothesis with a way to test it. Say so.
+
+## When this skill applies
+
+The goal is to help a user in two situations:
+
+1. **The AI is not meeting their needs.** They complain about a wrong, off-target, degraded, or unreliable result. Diagnose the cause.
+2. **They want a better prompt.** They ask how to improve a prompt, with or without a bad output in hand. Run the same diagnostic sequence on the prompt itself, find what is likely under-specified or mismatched, and return an improved version. With no failed output, rate lenses as **Can't tell** where there is no evidence and focus on the prompt and setup.
+
+## Common failure patterns and root causes
+
+Start here. The user's description of *when* it went wrong usually points to the cause before any lens analysis.
+
+| Pattern | Root cause | What happened | Fix |
+|---|---|---|---|
+| **First response wrong** | **Under-specification** | The prompt left out context, constraints, or the format. The most common cause and the cheapest to fix. | Add what was missing (see the diagnostic sequence, step 1). |
+| **Degraded over time** | **Context overload** | A long conversation approached the context limit. Earlier content may be automatically summarized to make room, and compressed detail means early instructions lose force. | Restart the chat or start fresh with a short summary. A better prompt will not help. |
+| **Specific error type** | **Wrong feature or model** | A calculation was requested in prose instead of code execution, or deep analysis was requested from a model tier chosen for speed. | Use the right tool or model, not more prompting. |
+| **Used to work** | **Stale configuration** | A standing instruction, knowledge source, or skill has drifted out of date and is silently degrading output. | Maintenance: review and update the instructions, knowledge, and skills. |
+
+These patterns are the *first cut*. They map onto the lenses below: under-specification is mostly a steerability gap, context overload is working memory, wrong feature or model is often next token prediction (prose math) or a capability mismatch, and stale configuration is often a knowledge problem. Use the lenses to explain the mechanism and to catch failures the patterns miss (fabrication, sycophancy, and so on).
+
+## Diagnostic sequence
+
+Run these in order before concluding the AI cannot do the task. Stop at the first step that explains the symptom, but note any secondary factors.
+
+1. **Re-read the prompt against its essential components.** Is anything under-specified? Check for: the goal and why it matters, relevant context or source material, constraints, the desired output format and length, and the audience or success criteria. If the first response was wrong, this is the most likely culprit.
+2. **Check the conversation length.** Is the context overloaded? If quality dropped as the chat grew, restart or summarize rather than rewording.
+3. **Check the feature and model.** Is this a calculation that needs code execution? A complex task on a speed-tier model? Is search or a needed tool off?
+4. **Check the configuration.** Are the standing instructions, knowledge sources, and skills current? Did the output get worse without the user changing anything?
+5. **Only then question whether the task is a fit at all.** If steps 1-4 are clean, the task may sit in the limitation zone (thin, vague, post-cutoff, long, or demanding exact specifics). Say so honestly and suggest verification or a different approach.
 
 ## The lenses
 
@@ -58,20 +88,24 @@ Fine-tuning on human preferences leaves fingerprints that the four properties do
 
 ## Procedure
 
-1. **Collect inputs.** You need: (a) what the person was trying to do, (b) the prompt or conversation (verbatim or summarized), (c) the output or a specific description of what it returned, (d) what was wrong, if they know. Also note, if available: conversation length, documents supplied, whether search or tools were on, and which model. If you cannot even tell what failed or what was asked, ask one short question. Otherwise proceed and state any assumptions.
-2. **Find the symptom.** Name the specific thing that went wrong in one line. Quote the exact spot when verbatim output is provided; otherwise name the specific missing, wrong, or off-target element. Do not diagnose in general terms.
-3. **Run each lens.** For every property, rate it **Likely**, **Possible**, **Unlikely**, or **Can't tell**, and give one line of evidence from the prompt, output, or described setup. If you have no evidence for a lens, rate it **Can't tell**. Do not force every lens to be a culprit.
-4. **Check fine-tuning habits.** Include this bullet only when there is real evidence, and name the specific habit.
-5. **Name the pair.** Choose the two properties (or one property plus one fine-tuning habit) that most plausibly collided and explain the interaction in two sentences. If one cause clearly dominates, name it as primary and note the most likely secondary factor.
-6. **Prescribe.** Give the fix for the diagnosed pair in order of effort: the quickest change first. Include a rewritten prompt or a concrete next step when useful.
-7. **Give a confirming test.** One quick experiment that would support or rule out the diagnosis (see below).
-8. **Connect to the habit.** One line on what to change next time: which part of delegating, describing, or checking would have prevented this.
+1. **Collect inputs.** You need: (a) what the person was trying to do, (b) the prompt or conversation (verbatim or summarized), (c) the output or a specific description of what it returned, (d) what was wrong, if they know. Also note, if available: conversation length, documents supplied, whether search or tools were on, which model, whether standing instructions or knowledge sources are in use, and whether it ever worked before. If you cannot even tell what failed or what was asked, ask one short question. Otherwise proceed and state any assumptions.
+2. **Find the symptom.** Name the specific thing that went wrong in one line. Quote the exact spot when verbatim output is provided; otherwise name the specific missing, wrong, or off-target element. Do not diagnose in general terms. For a prompt-improvement request, name the biggest gap between the prompt and the likely intent.
+3. **Match the failure pattern and run the diagnostic sequence.** Match the symptom to a pattern (first response wrong, degraded over time, specific error type, used to work) and walk the diagnostic sequence in order.
+4. **Run each lens.** For every property, rate it **Likely**, **Possible**, **Unlikely**, or **Can't tell**, and give one line of evidence from the prompt, output, or described setup. If you have no evidence for a lens, rate it **Can't tell**. Do not force every lens to be a culprit.
+5. **Check fine-tuning habits.** Include this bullet only when there is real evidence, and name the specific habit.
+6. **Name the pair.** Choose the two properties (or one property plus one fine-tuning habit) that most plausibly collided and explain the interaction in two sentences. If one cause clearly dominates, name it as primary and note the most likely secondary factor.
+7. **Prescribe.** Give the fix for the diagnosed pair in order of effort: the quickest change first. Prefer the fix that matches the root cause: add missing detail for under-specification, restart or summarize for context overload, switch tool or model for a feature mismatch, update the configuration for staleness. Do not suggest rewording when the cause is not the wording. Include a rewritten prompt or a concrete next step when useful.
+8. **Give a confirming test.** One quick experiment that would support or rule out the diagnosis (see below).
+9. **Connect to the habit.** One line on what to change next time: which part of delegating, describing, or checking would have prevented this.
 
 ## Output format
 
 ```
 **Symptom:** <what went wrong, quoting the exact spot or naming the specific failure>
 **Assumptions:** <only if context was missing, e.g., single-turn chat, search off>
+
+**Failure pattern:** <First response wrong / Degraded over time / Specific error type / Used to work / None clearly>, pointing to <under-specification / context overload / wrong feature or model / stale configuration / other>.
+**Sequence result:** <which diagnostic step first explained the symptom, e.g., "Step 1: prompt gave no output format">
 
 **Lens check**
 - Next token prediction: **<Likely/Possible/Unlikely/Can't tell>.** <one-line evidence>
@@ -99,6 +133,9 @@ Keep it tight. A typical diagnosis fits on one screen.
 ## Confirming tests
 
 - **Knowledge vs. next token prediction (fabrication):** Paste the real source into the prompt and re-run. If the error disappears, it was a knowledge gap. Or ask the same question three times; wildly different specifics suggest generation, not recall.
+- **Under-specification:** Add the missing context, constraint, or format and re-run in a fresh chat. If the output lands, the first prompt was the gap.
+- **Wrong feature or model:** Re-run the same prompt with code execution on, or on a stronger-tier model. If the error type disappears, it was the tool, not the wording.
+- **Stale configuration:** Run the same prompt with standing instructions, knowledge, and skills disabled or updated. If output improves, the configuration was the drag.
 - **Working memory:** Restart in a fresh chat with only the essentials stated up front. If quality recovers, it was a context problem.
 - **Steerability:** Restate the goal instead of the instruction. If the output improves, the gap was between your words and your intent.
 - **Sycophancy:** Push back on a correct answer and see whether it flips. Or ask the question neutrally, without revealing your preferred answer.
@@ -112,6 +149,9 @@ Keep it tight. A typical diagnosis fits on one screen.
 | Working memory + Steerability | Constraints set early are ignored 20 messages later; recent instructions quietly overwrite older ones | Resupply critical context, or restart with the essentials up front |
 | Knowledge + Steerability | You asked it to be authoritative on something it does not know well, so it complied convincingly | Supply the knowledge; allow "I don't know" explicitly |
 | Steerability + Next token prediction | A long reasoning chain drifted from a small early error that carried forward | Add checkpoints; request visible reasoning; verify intermediate results |
+| Steerability + Knowledge (under-specification) | Prompt omitted context or constraints, so the model filled the gaps with generic defaults | Add the missing context, constraints, and format |
+| Next token prediction + Wrong feature | Math, counting, or sorting done in prose where code execution was needed | Use a code or calculator tool |
+| Knowledge + Stale configuration | An outdated standing instruction or knowledge source quietly feeds old facts or rules into every answer | Review and update the instructions, knowledge, and skills |
 | Fine-tuning habit + any property | Agreeable cave-ins, bloat, or hedging layered on top of one of the above | Neutral phrasing; explicit format and length; give legitimate context |
 
 ## Principles
@@ -129,6 +169,9 @@ Keep it tight. A typical diagnosis fits on one screen.
 
 **Symptom:** All three returned paper titles and journal citations do not exist.
 **Assumptions:** Single-turn chat with web search off.
+
+**Failure pattern:** First response wrong, pointing to wrong feature (search off) plus a thin-knowledge topic rather than classic under-specification.
+**Sequence result:** Step 3: a request for exact, verifiable specifics was made with no search or source grounding.
 
 **Lens check**
 - Next token prediction: **Likely.** Titles have a realistic cadence, journals sound plausible, and everything is delivered in a confident, uniform tone.
