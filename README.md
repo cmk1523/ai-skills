@@ -18,6 +18,7 @@ A collection of reusable skills for LLMs and agents. Each skill is a folder with
 | [`clear-plan-writing-advice`](clear-plan-writing-advice/SKILL.md) | Writes project, team, launch, or event plans in a five-part format adapted from the military operations order (OPORD). Also writes advance notices and updates. |
 | [`engaged-answerer`](engaged-answerer/SKILL.md) | Answers right away, then asks 1 to 3 follow-up questions to tailor the answer. Use it for advice, planning, decisions, and troubleshooting. |
 | [`ai-failure-diagnostician`](ai-failure-diagnostician/SKILL.md) | Finds out why an AI output was wrong or weak and suggests a specific fix plus a quick test to confirm it. |
+| [`us-stock-price`](us-stock-price/SKILL.md) | Looks up the current United States stock price for a ticker from Yahoo Finance. Assumes the model can use the internet. |
 
 ## How skills work
 
