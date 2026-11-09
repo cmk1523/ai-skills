@@ -21,11 +21,14 @@ Return **only** the CSV as the assistant message, printed by following `format-a
 
 1. Read the full source text, or the file the user points at.
 2. Extract named people only. Skip pronouns, unnamed groups, and roles with no personal name (`She`, `the crew`, `the CEO` alone).
-3. A mention that refers to a person is extracted even if that string is also a place or organization somewhere in the text. Emit only the person row.
-4. Do not extract a person merely because their name is embedded in another name. `Washington University` is not a person named `Washington`. Extract the person only when the text refers to them as a person.
-5. Do not extract a person who appears only inside an email address, email domain, or URL host unless the text also refers to them as a person.
-6. Group mentions of the same person onto one row (see below). If two full names might be the same person and the text does not show it, emit two rows.
-7. Build `entity`, `synonyms`, and `title` from the grouped mentions, then emit rows in order of each person's first appearance. Print those rows by following `format-as-csv/SKILL.md`.
+3. Skip journalists, byline authors, and media staff who are mentioned only in credits, headers, or `By` lines (`By Jane Doe`, `Reporting by John Roe`, `Photo: Sam Poe`, `Edited by Ann Lee`). If the same person is also a subject of the article or is quoted or described as taking part in the events, extract them as a normal person.
+4. Prioritize people who are subjects of the article (involved in the events, actions, or story being reported) over observers or reporters. When deciding whether a borderline mention is a person to extract, include subjects and skip people whose only role is observing, reporting on, or commenting about the events from outside them. This affects which people are extracted, not row order: rows stay in order of first appearance.
+5. A mention that refers to a person is extracted even if that string is also a place or organization somewhere in the text. Emit only the person row.
+6. Do not extract a person merely because their name is embedded in another name. `Washington University` is not a person named `Washington`. Extract the person only when the text refers to them as a person.
+7. Do not extract a person who appears only inside an email address, email domain, or URL host unless the text also refers to them as a person.
+8. In your reasoning, list every extracted full name immediately after extraction, before grouping anything. Then scan the rest of the text for standalone surnames and nicknames that match a listed name (see "Same person"). Only after that scan, compile the final rows.
+9. Group mentions of the same person onto one row (see below). If two full names might be the same person and the text does not show it, emit two rows.
+10. Build `entity`, `synonyms`, and `title` from the grouped mentions, then emit rows in order of each person's first appearance. Print those rows by following `format-as-csv/SKILL.md`.
 
 ## Same person
 
@@ -33,6 +36,8 @@ Merge mentions into one row only when one of these is true:
 
 - **Explicit alias.** The text equates the names (`also called`, `aka`, `née`, `born`, `whose real name is`, parentheses, or a quoted nickname inside the name). `Robert "Bob" Smith` is entity `Robert Smith` and synonym `Bob`. The quoted nickname is not part of `entity`.
 - **Unique subset.** After title stripping, every name token of one mention sits inside exactly one other person's name, and no other person shares that token. `Lovelace` merges into `Ada Lovelace` when she is the only Lovelace.
+- **Standalone surname.** A bare surname that appears anywhere in the text, usually after the full name (`Smith` after `John Smith`), is a synonym of that person when no other person in the text shares that surname. It stays a synonym even when it is the only later reference to them. If another person shares the surname, drop it (see below).
+- **Nickname.** A nickname or short given name (`Bob`, `Liz`) found in the scan merges into a full name as a synonym only when the text supports the match: an explicit alias, or exactly one listed person whose given name the nickname plainly shortens and no other listed person it could mean. Otherwise keep it unmerged and do not emit a row for the fragment unless it is clearly a different named person.
 - **Unique initialism.** A letter-initial form merges into a fuller name only when both appear and the initials match that one person. `JFK` merges into `John F. Kennedy` when both refer to the same person. If the full name is absent, keep `JFK` and do not expand it.
 - **Comma inversion.** `Smith, John` is the same person as `John Smith` when the name tokens match one person.
 
@@ -153,6 +158,8 @@ Check silently, then print only the CSV:
 - No synonym repeats `entity`. Synonyms list name-forms before aliases, and each group is in first-appearance order. No functioning title remains on `entity`. No incidental description is in `title`.
 - No `UNKNOWN` or other sentinel. Empty optional fields are empty.
 - Ambiguous short forms and unnamed people are absent.
+- Full names were listed first, then the text was scanned for unique standalone surnames and supported nicknames before rows were compiled.
+- Journalists, byline authors, and media staff named only in credits, headers, or `By` lines are absent. Subjects of the events are present.
 
 ## Do not
 
@@ -163,3 +170,5 @@ Check silently, then print only the CSV:
 - Do not add a row for a synonym, a pronoun, an unnamed role, or an ambiguous short form.
 - Do not expand a name the source never writes.
 - Do not fabricate people, aliases, or titles.
+- Do not extract journalists, byline authors, or media staff mentioned only in credits, headers, or `By` lines.
+- Do not favor observers or reporters over the people involved in the events.
