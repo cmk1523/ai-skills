@@ -1,130 +1,111 @@
 ---
 name: extract-places
-description: Extracts places from text into strict CSV with entity, synonyms, country, state, and city. Use when the user asks to extract places or locations.
+description: Extracts named places from text, with country, city, and state filled only from words the text states verbatim. Use when the user asks to extract places or locations.
 ---
 
 # Extract places
 
-Extract **places** from the given text: countries, states, provinces, regions, cities, districts, and named geographic features (rivers, mountains, lakes, and similar).
+Return the distinct named places mentioned in the text, one entry per place. Each entry has the place's name plus `country`, `city`, and `state`. The output format is enforced elsewhere; this skill decides what to include, which form of the name to return, and what to copy into those three columns.
 
-Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+## What counts as a place
 
-**Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
+Include named:
+- countries, states, provinces, counties, regions, cities, towns, villages, districts, neighborhoods
+- continents, peninsulas, islands, valleys, deserts, basins
+- rivers, lakes, seas, canals, mountains, capes, canyons
+- ports and other geographic sites
+- physical sites and landmarks such as bridges, parks, stations, forts, castles, squares, palaces and monuments. A named landmark counts even when its name has no type word (a fort called `Castillo de X`) and even when the type word is part of its name (`Harlow Bridge`).
+- named regions with no type word (`the Vellmark`-style names), and fictional places from stories (`the Hollowmere`, `Castle Vandrel`).
 
-## When to use
+Obscure names count too if the text uses them as places (`a map of Quillon`: a neighborhood, so include it). Lowercase or oddly cased names count (`brindle`, `calvera`), and so do names in all caps (a dateline such as `OSLO`).
 
-- The user provides text or a file and wants places extracted.
-- The user asks for places or locations.
-- The user wants spreadsheet-ready or machine-readable places CSV.
+These also count:
+- A place used for its government or people (`Quenby rejected the plan`).
+- A place used as a plain modifier before a lowercase common noun (`the Quenby office`, `The Brava ministry`, `the Tosca subsidiary`), including at the start of a sentence after "The". Only a capitalized official name (`Ministry of X`, `X Port Authority`) excludes the place.
+- A place named only to say something is absent or negated (`no cases in Tavelia`, `denies travel to Dalmora`).
+- A place after an address or street: `14 Elm Street, Wexcombe` still gives `Wexcombe`. Streets are skipped, the town is not.
 
-## Extraction
+## What to exclude
 
-1. Read the full source text, or the file the user points at.
-2. Extract places only.
-3. Do not extract demonyms or adjectival forms (`American`, `French`, `European`) unless they are part of a proper place name. Do not extract street addresses, buildings, or venues unless the text uses them as a geographic place.
-4. Do not extract a place that appears only inside an email address, email domain, or URL host unless the text also refers to it as a place.
-5. Do not extract postal or ZIP codes, and do not add a column for them.
-6. Copy each `entity` **verbatim** from the source. Keep the original spelling, capitalization, punctuation, and spacing. Do not rewrite, expand, abbreviate, translate, or otherwise normalize the `entity` value.
-7. Emit one row per distinct place. Keep the first verbatim mention as `entity`. Deduplicate case-insensitively when the same spelling appears again; a case-only variant is not a synonym. If the same name refers to two different places in the same text (for example `London, Ontario` and `London, England`), emit a row for each distinct place.
-8. Emit rows in order of first appearance. Print those rows by following `format-as-csv/SKILL.md`.
-9. Apply the synonym rules below. Extract `synonyms` **only** from the source text, never from external knowledge. Do not emit separate rows for synonyms.
+The key test: does the name refer to the location itself? If it is only a piece of the name of something else, skip it.
 
-### Location stacks
+- **Generic place words** with no proper name: downtown, the city center, the harbor, the old market, the park, home, the lake house, the village.
+- **Demonyms and adjectives** (Parisian, French, Texan, Hawaiian, Colombian, Swiss, Spanish). Do not extract the place they derive from. `Marlow-based` is different: it names Marlow directly, so include it.
+- **Diseases and viruses named after places** (`X fever`, `X virus`, `X disease`) are not places.
+- **Place names that are part of the name of a non-place thing.** Skip the place word in all of these, even if it is a famous city or country:
+  - organizations, companies, banks, universities, sports teams, agencies, authorities, ministries, institutes, committees, subsidiaries, when the name is capitalized as one name (`University of X`, `Bank of X`, `X Dynamics`, `X Port Authority`, `Port of X Authority`, `X Maritime Institute`, `X Monetary Authority`, `X Pacific Rail`, `X Dominion`). Such a place is only extracted if it also appears elsewhere as a place on its own.
+  - businesses named after places (`Hotel X`, `X Grill`, `X Lodge`, `X Cafe`, `X Bistro`). In "drinks at the Velmar Grill in Tosca", only Tosca is a place.
+  - products, services, trains, routes and deals (`X Express`, `the X arrangement`, `the X line` as a brand)
+  - geological or scientific formations and groups (`X River Basalt Group`)
+  - hashtags and @handles, including any place inside them (`#City2030`, `@kim_from_X`).
+- **Streets and addresses:** streets, roads, avenues, highways, routes and house numbers (`14 Elm Street`, `Harbor Road`, `Route 9`) are not places.
+- **People's names:** a word that is a place name but is used as a person's first or last name, including names in credit lines (By, Photos, Prepared by, Reviewed by), is not a place.
+- **Dates, emails, phone numbers, postal codes, and URL hosts** that are not used as places.
 
-When the text names one city as `City, Region, Country` (for example `London, England, United Kingdom`), `City, Region` (for example `Austin, Texas`), or `City, Country` (for example `Paris, France`):
+## One entry per place
 
-- Emit the city (`entity` is the city name alone, such as `London`, `Austin`, or `Paris`). Fill `country`, `state`, and `city` from that stack and unambiguous geography.
-- Emit the country as its own row whenever the country is written in the text (including inside the stack, unlike the region; for example `United Kingdom` or `France`).
-- Do not emit the region as its own row when it appears only inside a city stack. It belongs in the city row's `state`.
-- Emit the region when the text also uses it as a place on its own, or when the stack is `Region, Country` with no city (for example `Ontario, Canada` emits both an `Ontario` row and a `Canada` row).
-- Exception: `Washington, D.C.` is a single compound place name, not a two-part stack. Its verbatim `entity` is `Washington, D.C.`, with `country` = `United States`, `state` = `District of Columbia`, and `city` = `Washington`. `format-as-csv/SKILL.md` quotes the entity because the name contains a comma.
+- **Every level is its own entry, always.** In a comma hierarchy, a dateline, or an `of`/`in` container, the container (country, state, region) is a separate entry, never dropped and never combined into one string. Copying a container into another entry's column does NOT replace its own entry. The last item after a comma is a place too. `Quenby, Dalmora` gives two entries: `Quenby` and `Dalmora`. `Lund, Sweden` gives `Lund` and `Sweden`. `Dayton, Ohio` gives `Dayton` and `Ohio`. `the Moor region of Tavelia` gives `Moor` and `Tavelia`. `Kell, Pell County, Dalmora` gives three entries. `Brava, Ontaro-style province, Tavelia` also lists `Tavelia`. This holds even if the container is mentioned nowhere else.
+- **Same place, several mentions:** return it once, in the **fullest** form that appears anywhere in the text. This covers:
+  - short forms (`Mount Alder` then `Alder`; `Alder` then later `Alder National Park` gives only `Alder National Park`)
+  - possessives (`Alder's slopes`)
+  - abbreviations or initialisms of a name also given in full anywhere in the text. Return only the full name.
+  - case-only variants (`calvera`, `Calvera`): return the capitalized form, even if the lowercase form came first or is more frequent.
+  - a dateline in caps and a normal-case form (`OSLO, Norway` and later `Oslo`, or even only `OSLO`): return the normal capitalized form `Oslo`, never the all-caps one, in the name and in any column.
+  - the same place repeated outside its hierarchy (`Dalmora` in `Quenby, Dalmora`, and later `the laws of Dalmora`): one entry.
+- Two different places that share a name (`Salem, Fernwick` and `Salem, Massachusetts`) are separate entries.
+- If the text uses only an acronym for a place and never the full name, return it as written.
 
-A separate mention is its own row even if another row already uses that name as a geo value. `Washington, D.C. in the US` is a city row and a `US` row.
+## Form of each name
 
-### Verbatim names, acronyms, and text-only synonyms
+- Copy the name as written in the text, keeping spelling, accents, and punctuation. Do not translate or expand it.
+- If a name appears only in lowercase (casual chat: `tarvos`, `lisboa`), return it exactly as written in lowercase, and write the same lowercase form in the columns. Capitalize only when a capitalized form of that same place appears somewhere in the text.
+- Keep type words that are capitalized as part of the proper name: `Mount Alder`, `Kessel River`, `Lake Orrin`, `Port Varo`, `Cape of Storms`, `Elm Valley`, `Grand Union Station`, `Fort Brandt`, `Harlow Bridge`.
+- Always drop a lowercase generic descriptor that follows the name (region, peninsula, province, area, island, city, county, district): `the Varga peninsula` gives `Varga`, `the Ruhn region` gives `Ruhn`, `the Vellmark-style region of X` gives `Vellmark-style`, `the Tesh area` gives `Tesh`. No entry may end in a lowercase word like "region" or "peninsula".
+- Drop a lowercase descriptor before the name with `of`: `the island of Morwen` gives `Morwen`, `the town of Kell` gives `Kell`. A capitalized `of` name stays whole (`Cape of Storms`, `Gulf of Tessar`).
+- Drop lowercase directional or qualifier words before a name (`northern`, `western`, `central`, `greater`, `upper`, `south of`, `near`): `northern Brava` gives `Brava`. Keep capitalized direction words that are part of the proper name (`North Veldmark`, `Southwest Ombria`).
+- Drop leading articles and prepositions (`the`, `in`, `near`).
 
-- If the text says `US`, the entity is `US`, not `United States`. If the text says `United States`, the entity is `United States`, not `US`.
-- Populate `synonyms` **only** from aliases, acronyms, expansions, or alternate names that actually appear in the source text for that same place. Do **not** add synonyms from external or world knowledge.
-- If the source text uses only one name for a place (for example only `US`, or only `United Kingdom`), leave `synonyms` blank.
-- If the source text writes multiple forms for the same place (for example `United Kingdom` and `UK`, `Washington, D.C.` and `DC`, or punctuation variants like `U.S.` and `US`), emit **one row** for that place using its first verbatim mention as `entity`, and list the other source-attested form(s) in `synonyms` in order of their first appearance in the text (deduplicated case-insensitively). Do not emit separate rows for those synonyms.
-- Never put the row's own verbatim `entity` string in its `synonyms`.
+## Country, city, and state
 
-### Geo columns
+Every entry has `country`, `city`, and `state`. Each value is a name copied from the text (in the same form and case as the name field), or `""`. Always include all three keys. Never infer containment from world knowledge: that a city is in some country, or a landmark is in some city, is not a reason to fill a column.
 
-Fill `country`, `state`, and `city` from the text when it gives them, and from unambiguous world knowledge given the context when it does not. Always use canonical full names (not abbreviations or codes) in `country`, `state`, and `city` (for example `United States`, `Ontario`, `Washington`).
+Fill a column only in these cases:
 
-- Country-only mention: set `country` to the canonical country name. Leave `state` and `city` blank. If the entity is an acronym, `country` is still the full country name (`US` → `United States`).
-- State, province, or region mentioned as its own place: set `state` to the canonical region name, set `country` when it is known, leave `city` blank.
-- City mention: set `city` to the canonical city name. Set `country` and `state` when the text or unambiguous geography supports them. A city may leave `country` or `state` blank when they are not supported.
-- Sub-city district or borough (for example `Manhattan`): set `city`, `state`, and `country` when unambiguous (`New York`, `New York`, `United States`).
-- A continent, multinational region, or named feature that does not fit inside a single country, region, or city (such as `Europe` or a multi-country river, mountain range, or lake) leaves unsupported geo columns blank unless the text places the mention in a specific one.
-- Do not guess. `Amazon` the river spans more than one country, so its geo columns stay blank.
-- Do not write `UNKNOWN`, `N/A`, `null`, or `""`.
+1. **The place itself is that kind of place.** This applies even with no context at all, and even after direction words are dropped (`northern Brava` still gives country `Brava` if Brava is a country). Decide the kind from what the place is, regardless of letter case.
+   - A country fills `country` with its own name (`Brevonia` alone: country `Brevonia`). Never leave a country's own `country` empty.
+   - A city, town or village fills `city` with its own name, even a lowercase or lesser-known one in casual chat (`tarvos`: city `tarvos`).
+   - A US state fills `state` with its own name (`Nevada`, `Vermont`, `Ohio`), even when mentioned alone in a sentence. So does a unit written with the word State (`Tolan State`). Never leave a US state's own `state` empty.
+   - Counties, provinces, historical or informal regions, large multi-country areas, and districts are NOT states and never fill `state` with their own name (`Marrowdale`-style county regions, `Southern Quillara`-style areas: all three columns empty unless a phrase states otherwise).
+   - A city-state is both: it fills `country` and `city` with its own name (`Monaco`).
+2. **The same phrase states one for this place.** Copy that name into the matching column:
+   - a comma hierarchy. `Quenby, Dalmora`, Dalmora a state: Quenby gets `city` `Quenby`, `state` `Dalmora`. `Quenby, Tavelia`, Tavelia a country: Quenby gets `country` `Tavelia`. The container entry also fills its own kind (`Dalmora` gets `state` `Dalmora`; `Tavelia` gets `country` `Tavelia`).
+   - a chain. `Kell, Pell County, Dalmora`: Kell gets `city` `Kell` and `state` `Dalmora`; Pell County gets `state` `Dalmora`; Dalmora gets `state` `Dalmora`.
+   - a coordination closed by one place. `Quenby and Brava, Tavelia`: both get `country` `Tavelia`.
+   - an `of` or `in` container. `the Moor region of Tavelia`: Moor's `country` is `Tavelia`.
+   - a possessive city. `Quenby's Sable district`: Sable's `city` is `Quenby`.
+   - a province or region written next to a country (`Karvel-style province, Country`) gets that `country`, with `city` and `state` empty.
 
-`country`, `state`, and `city` are the place's geography. They are not extra entity rows unless they are also written in the text (following the location-stack and verbatim mention rules above).
+Leave the column `""` in every other case.
 
-## Output
+- `city` is only for cities, towns and villages. A province, county, region, island, district, neighborhood, borough, valley, landmark or any other kind of place never gets `city` filled with its own name (`the Tesh district` has all three columns empty; a bare neighborhood name has `city` empty even if it is inside a city).
+- A well-known province or region name is not a city even if it also sounds like one.
+- A country, city, or state named in another sentence or clause, or in a dateline for a place elsewhere in the text, does not fill this place (`lives in Brava so maybe Tavelia after`: Brava's `country` stays empty). A city mentioned alone, or next to a demonym (`the Spanish ministry in Valdora`), has empty `country` and `state`. A landmark or river mentioned near a city has `city` empty.
+- A demonym does not fill a column.
+- Do not split a name. A state called `North Veldmark` has `state` `North Veldmark` and an empty `city`.
+- Do not expand an abbreviation inside a column.
+- If you are not sure what kind of place it is, leave that column empty.
 
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
+## Order and empty input
 
-Column contract for that skill:
-
-- Header, exact and unquoted: `entity,synonyms,country,state,city`. Emit it even when there are no places.
-- `entity` is a required scalar. If it would be blank, do not emit the row.
-- `synonyms` is one cell, ordered by first appearance in the source text and deduplicated case-insensitively. A place with no synonyms has an empty cell. Several names are joined with `;` and no spaces. Quote that cell only when `format-as-csv/SKILL.md` requires it.
-- `country`, `state`, and `city` are scalars.
-- Keep every column. Blank fields stay in place: `London,,United Kingdom,England,London` and `Amazon,,,,`
-- Unknown optional fields are empty.
-- Emit rows in order of first appearance.
-
-## Worked example
-
-Source text:
-
-```
-On March 12, 2024, Dr. Ada Lovelace (also called Ada), a mathematician, spoke at the Analytical Engine Summit in London, England, United Kingdom (UK). She also visited Washington, D.C. in the US. Contact press@example.com or +1-415-555-0100. The summit ran through March 14, 2024. NASA, ACME Labs, and Amazon hosted the stream from 203.0.113.10. A crew filmed along the Amazon.
-```
-
-Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
-
-```
-entity,synonyms,country,state,city
-London,,United Kingdom,England,London
-United Kingdom,UK,United Kingdom,,
-"Washington, D.C.",,United States,District of Columbia,Washington
-US,,United States,,
-Amazon,,,,
-```
-
-`London, England, United Kingdom` is one city. England is `state`, not its own row. `United Kingdom` and `UK` both appear in the text for the same country, so the first mention (`United Kingdom`) is `entity` and `UK` is placed in its `synonyms` without emitting a separate `UK` row. `Washington, D.C.` is quoted because the name contains a comma; its `synonyms` stays blank because no alternate name for it appears in the text, while `United States`, `District of Columbia`, and `Washington` are filled from context and knowledge. `US` stays `US` with `synonyms` blank because `United States` is not written in the text, while `country` is set to `United States` from knowledge. `Amazon` the river is a place with blank geo. Ada Lovelace, the summit, NASA, ACME Labs, Amazon the company, and the email, phone, and IP are not place rows.
-
-## Empty input
-
-If the source contains no extractable places, emit the header only:
-
-```
-entity,synonyms,country,state,city
-```
+List places in order of first appearance. If the text has no places, return an empty list.
 
 ## Before replying
 
-Check silently, then print only the CSV:
-
-- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,synonyms,country,state,city`.
-- One row per distinct place, in order of first appearance. `entity` is the first verbatim source spelling.
-- `synonyms` contains only alternate names/acronyms for that place that actually appear in the source text (never from external knowledge), never repeats `entity`, and those synonyms do not get their own rows.
-- `country`, `state`, and `city` are filled from the text and from unambiguous world knowledge given the context. Empty fields are empty.
-- No people, organizations, events, selectors, postal codes, or `type` column.
-
-## Do not
-
-- Do not write the CSV to disk or wrap it in a markdown fence.
-- Do not output JSON, a Markdown table, or the five-group entity CSV.
-- Do not extract people, organizations, events, or selectors.
-- Do not leave `entity` blank or repeat it in `synonyms`.
-- Do not add synonyms from external knowledge; extract `synonyms` only from the source text.
-- Do not rewrite, expand, or abbreviate a name in the `entity` column.
-- Do not write `UNKNOWN` or any other sentinel for a missing optional field.
-- Do not extract postal or ZIP codes.
-- Do not fabricate places. Do not invent geo values when the mapping is uncertain.
-- Do not extract a place that appears only inside an email domain or URL host unless the text also refers to it as a place.
+- Is every entry a named place and not a generic word, demonym, disease, street, person's name, handle, or hashtag?
+- Does each entry appear at least once as a place on its own, not only inside a capitalized organization, authority, institute, business, formation, or hashtag name? Remove it if not (e.g. a city inside `Port of X Authority` or `X Maritime Institute`).
+- Go through every comma, dateline, and `of`/`in` hierarchy: does each country, state, and region in it have its own entry? Do all countries and US states, wherever they appear, have entries with their own column filled?
+- Is any entry an abbreviation, shorter form, possessive, or descriptor-trimmed duplicate of another? Merge into the fullest form, using the normal capitalized form instead of ALL CAPS, in both name and columns.
+- Does any entry keep a lowercase descriptor ("region", "peninsula") or qualifier ("northern")? Remove it. Did a lowercase-only name stay lowercase?
+- Did you keep towns found after street addresses, lowercase-modifier places (`The X ministry`), obscure neighborhoods, and named landmarks and regions?
+- Is every column either `""` or a name written in the same phrase? Clear any filled from knowledge, another sentence or clause, a demonym, or a dateline.
+- Is `city` filled only for cities, towns and villages, and `state` only for US states and `X State` units (or a state named in the phrase)?

@@ -1,0 +1,21 @@
+entity,selector type,description
+00:1A:2B:3C:4D:5E,MAC_ADDRESS,the MAC address for the compromised terminal
+198.51.100.74,IP_ADDRESS,the IP address for the command-and-control server
+2001:0db8:85a3:0000:0000:8a2e:0370:7334,IP_ADDRESS,the IP address for the IPv6 node
+e.rostova@aegishorizon.com,EMAIL,the email for Elena Rostova
++1-703-555-0194,PHONE,the phone number for Elena Rostova
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,GENERIC,the SHA-256 hash for the staged payload
+https://vault.aegishorizon.com/api/v2/export,URL,the URL for the staged payload
+m.vance@fbi.gov,EMAIL,the email for Marcus Vance
+(202) 555-0147,PHONE,the phone number for Marcus Vance
+900-45-6789,SSN,the Social Security number for Viktor Korsakov
+N74829103,GENERIC,the passport number for Viktor Korsakov
+356938035643809,IMEI,the IMEI for the recovered burner handset
+310150123456789,IMSI,the IMSI for the recovered burner handset
+WBA3A5C51DF358912,GENERIC,the VIN for the rental sedan
+@korsakov_ghost,HANDLE,the Telegram handle for Viktor Korsakov
+v.korsakov88@protonmail.ch,EMAIL,the encrypted email for Viktor Korsakov
+203.0.113.195,IP_ADDRESS,the IP address for the secondary relay
++44 20 7946 0823,PHONE,the London landline
+bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq,GENERIC,the Bitcoin wallet that received the wire transfers
+CH93 0076 2011 6238 5295 7,GENERIC,the IBAN for the Helvetia Trust disbursement
