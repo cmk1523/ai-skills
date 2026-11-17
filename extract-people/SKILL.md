@@ -1,171 +1,112 @@
 ---
 name: extract-people
-description: Extracts people from text into strict one-row-per-person CSV with names and source-attested aliases or nicknames. Ignores honorifics, ranks, job titles, and other role labels. Use when the user asks to extract people, person names, aliases, nicknames, or a people-only entity CSV.
+description: Extracts the people named in a text as a list of name strings, one per distinct person, in their fullest attested form. Ignores credits, titles, handles, places, and organizations. Use when the user asks to extract people or person names.
 ---
 
 # Extract people
 
-Extract **people** from the given text. Return only their names and source-attested aliases or nicknames. Ignore titles, honorifics, ranks, offices, professions, and role descriptions. Do not add people or aliases from outside knowledge.
+Return every distinct **person** named in the text as one plain string per person. The output is a flat list of strings. Never return objects, nested fields, aliases, or extra columns. Do not add people from outside knowledge.
 
-Return **only** the CSV as the assistant message, printed by following `format-as-csv/SKILL.md`. Do not add prose, markdown fences, or commentary unless the user explicitly asks for an explanation after the CSV.
+Read the whole text before deciding any entry. Each named human gets exactly one entry: two entries for one person is an error, and so is zero.
 
-**Do not write the CSV to disk.** Do not run a shell command, script, or tool to create, save, redirect, or append a file. Reading a file the user points at is fine. The result is the CSV printed in the reply.
+## Credits are skipped (check this first)
 
-## When to use
+A person named only in a credit or production line is NOT extracted, even when a job title, department, organization, or company follows the name. Credit markers include: `By ...`, `Reporting by`, `Additional reporting by`, `Photo(s)/Photograph(s)/Images/Video: ...`, `Edited by`, `Compiled by`, `Prepared by`, `Transcript prepared by`, `Reviewed by`, `Approved by`, `Source:`. This holds in long documents, and at the very start or end of the text.
 
-- The user provides text or a file and wants people extracted.
-- The user asks for people, persons, or person names.
-- The user wants spreadsheet-ready or machine-readable people CSV.
+Example: `Transcript prepared by: Nadia Quillfeather, Clearwater Records Unit` at the bottom of a hearing means `Nadia Quillfeather` is not extracted (unless she also takes part in the events).
 
-## Extraction
+Extract such a person only if they are also named elsewhere as taking part in the events or conversation. A sign-off in a conversation (an agent replying to a customer) is participation, not a credit. A header field naming a role-holder inside the events (`Incident commander: ...`, `Court Clerk: ...`, `For Plaintiff: ...`) is a participant, not a credit.
 
-1. Read the full source text, or the file the user points at.
-2. Extract named people only. Skip pronouns, unnamed groups, and roles with no personal name (`She`, `the crew`, `the CEO` alone).
-3. Skip journalists, byline authors, and media staff who are mentioned only in credits, headers, or `By` lines (`By Jane Doe`, `Reporting by John Roe`, `Photo: Sam Poe`, `Edited by Ann Lee`). If the same person is also a subject of the article or is quoted or described as taking part in the events, extract them as a normal person.
-4. Prioritize people who are subjects of the article (involved in the events, actions, or story being reported) over observers or reporters. When deciding whether a borderline mention is a person to extract, include subjects and skip people whose only role is observing, reporting on, or commenting about the events from outside them. This affects which people are extracted, not row order: rows stay in order of first appearance.
-5. A mention that refers to a person is extracted even if that string is also a place or organization somewhere in the text. Emit only the person row.
-6. Do not extract a person merely because their name is embedded in another name. `Washington University` is not a person named `Washington`. Extract the person only when the text refers to them as a person.
-7. Do not extract a person who appears only inside an email address, email domain, or URL host unless the text also refers to them as a person.
-8. In your reasoning, list every extracted full name immediately after extraction, before grouping anything. Then scan the rest of the text for standalone surnames, short given names, aliases, and nicknames that match a listed name (see "Same person"). Only after that scan, compile the final rows.
-9. Group mentions of the same person onto one row (see below). If two full names might be the same person and the text does not show it, emit two rows.
-10. Build `entity` and `synonyms` from the grouped mentions, then emit rows in order of each person's first appearance. Print those rows by following `format-as-csv/SKILL.md`.
+## What counts as a person
 
-## Same person
+- Any mention that refers to a human being by a personal name: full names, a given name alone (`Bram`, `Lior`), or a surname alone (`Ostrander`).
+- A lone surname with no fuller form anywhere in the text is still a person (`ask Ostrander`, `Ostrander signed the form`). Return it even when it is mentioned only in passing, only talked about by others, or when you cannot tell its given name or exact role. An unexplained capitalised word that acts like a human (signs, approves, replies, is away, has an assistant, is called he or she) is a person, not a team or company.
+- Lowercase names are people. In informal writing, a lowercase word right after a relation or role word, or after `named` / `called`, is a name: `my manager noemi`, `my landlord otis`, `a woman named freya`, `thanks marisol`. If no fuller form exists, return it as written.
+- A chat or transcript speaker label that is a personal name (`Dmitri:`, `Fiona Valdecasas:`) is a person.
+- People who are only mentioned, not speaking, are people too: coworkers, bosses, family members, customers, support staff, assistants, and agents who sign off with a name.
 
-Merge mentions into one row only when one of these is true:
+## What is not a person
 
-- **Explicit alias.** The text equates the names (`also called`, `aka`, `née`, `born`, `whose real name is`, parentheses, or a quoted nickname inside the name). `Robert "Bob" Smith` is entity `Robert Smith` and synonym `Bob`. The quoted nickname is not part of `entity`.
-- **Unique subset.** After ignoring attached titles, every name token of one mention sits inside exactly one other person's name, and no other person shares that token. `Lovelace` merges into `Ada Lovelace` when she is the only Lovelace.
-- **Standalone surname.** A bare surname that appears anywhere in the text, usually after the full name (`Smith` after `John Smith`), is a synonym of that person when no other person in the text shares that surname. It stays a synonym even when it is the only later reference to them. If another person shares the surname, drop it (see below).
-- **Nickname.** A nickname or short given name (`Bob`, `Liz`) found in the scan merges into a full name as a synonym only when the text supports the match: an explicit alias, or exactly one listed person whose given name the nickname plainly shortens and no other listed person it could mean. Otherwise keep it unmerged and do not emit a row for the fragment unless it is clearly a different named person.
-- **Unique initialism.** A letter-initial form merges into a fuller name only when both appear and the initials match that one person. `JFK` merges into `John F. Kennedy` when both refer to the same person. If the full name is absent, keep `JFK` and do not expand it.
-- **Comma inversion.** `Smith, John` is the same person as `John Smith` when the name tokens match one person.
+- Usernames, handles, `@mentions`, `u/` names, and email addresses or their local parts (`tori_k`, `devon.t`, `@hollis_q`, `b.varga@...`). Never turn a handle into a name (`hollis_q` is not `Hollis Q`). If the text also writes that person's real name, extract the real name.
+- Service accounts, threat-group labels, pets, and anonymous roles (`the CEO`, `a contractor who declined to give a name`).
+- Initial sign-offs such as `-QH`, and pronouns.
+- Places, organizations, products, events, and software.
+- A person's name inside the name of a venue, facility, institution, firm, or product is not a person (`Franklin University`, `Marlowe Auditorium`, `Dunmore Water Engineering`, `Sutter Lounge`). Only count that person if the text names them separately as a person.
+- Names that appear only in case captions or legal citations (`X v. Y`).
+- People who only report on or observe the events from outside.
+
+## Same person: one entry per person
+
+Compare mentions case-insensitively. Merge mentions into one entry when:
+
+- **Short first, full later.** A person often appears first under a short name and only later under a fuller one: a speaker label `Zdenka` near the top and `Zdenka Hrubá` further down; `a guy named wim` and, later, `wim Aalders`. That is one person and one entry: the fuller form. Replace the short entry; never keep both.
+- **Explicit alias.** The text equates the names (`also known as`, `aka`, `née`, `X is Y`, `full name Y`, parentheses, or a quoted nickname inside the name). `Alaric "Al" Smith` is one person.
+- **Subset.** A mention whose name tokens all sit inside exactly one other person's name is the same person (`Lovelace`, `Ada`, `ada`, `C. Vandermeer` for `Cordelia Vandermeer`). This applies regardless of order, casing, or where the mention appears, and to speaker labels too: a speaker `Sana` and a speaker `Sana Draganov` are one person, and so are `pedro` and `pedro Alvarez`. A later bare surname is the same person when no other listed person shares it.
+- **Nickname or short form.** `Bill`, `Mike`, and `ray` merge into a fuller name when the text supports it, in any of these ways:
+  - an explicit alias;
+  - exactly one listed person whose given name it is a usual short or pet form of, even when spelled differently (`Peggy` for `Margaret Thistlewood`);
+  - a role or context link (`Vic, the technician` and a full-named technician; a staff member first mentioned by a short name, and a full-named person in that same role who later uses that short name for themselves).
+
+  When such a link exists, the short name is not a new person.
+- **Comma inversion.** `Tanaka, Hiroshi` is `Hiroshi Tanaka`.
+- **Initialism.** `EMQ` or `Q. Lê` merges with the full name only when the match is unique.
+
+**Never combine a nickname with a surname.** If the text says `Verena "Vee" Ashcombe`, or a person is called `Vee` later, the only entry is `Verena Ashcombe`. A quoted nickname standing next to the surname does not make `Vee Ashcombe` a name. Never output `Vee Ashcombe`, `Mike Tolliver`, or any `Nickname Surname` string unless those exact words appear together, with no quote marks, in the source. A nickname is never its own entry when it ties to a listed person; just drop it.
 
 Do not merge:
 
-- Two full names that share only a given name or only a surname (`John Smith` and `Jane Smith`; `John Smith` and `John Doe`).
-- A short form that matches more than one person. Drop it. Do not attach it to any row, and do not emit a row for the fragment (`Smith` when `Robert Smith`, `Jane Smith`, and `John Smith` are all present).
-- Two people the model only knows are the same from outside knowledge.
+- Full names that differ in the given name or the surname (`Elias Smith`, `Jane Smith`).
+- Siblings, or a father and son (`Warren Fairbairn II`, `Warren Fairbairn III`). Suffixes distinguish people.
+- A short form that could match more than one person (`Smith` when two Smiths exist). Drop it and emit no entry for it.
+- People who are the same only according to outside knowledge.
 
-`Mr. and Mrs. John Smith` names one person, `John Smith`. The `Mrs.` is an unnamed spouse, so there is no second row.
+A person who appears only under a short form (given name only, or surname only) is returned in that form.
 
-A title that governs a list is ignored while each named person is extracted (`Senators Warren and Booker` → `Warren` and `Booker`).
+## Which form to return
 
-## Entity and synonyms
+Return the fullest attested form of the name, copied from the source. Look across ALL mentions of the person, including later ones and answers such as "State your full name", and pick the form with the most name tokens (a form with a middle name beats a form without one). Never add tokens the source does not write, and never translate or expand a name yourself.
 
-Strip attached titles, possessives, and sentence punctuation first (rules below). What remains is copied verbatim: original spelling, capitalization, and internal punctuation. Never capitalize a name yourself. Do not translate, expand, abbreviate, or reorder it.
+- Remove attached titles, honorifics, ranks, and role labels (`Dr.`, `Mr.`, `Ms.`, `Prof.`, `Capt.`, `Hon.`, `Mayor`, `Governor`, `Esq.`, `Uncle`, `Brother`, and appositive roles such as `, the CEO`). A title governing a list applies to each person.
+- Keep generational suffixes (`Jr.`, `Sr.`, `II`, `III`).
+- Remove possessive `'s`, sentence-ending periods, wrapping quotes, and a quoted nickname inside the name. Keep apostrophes that belong to the name and periods in initials.
+- Keep a word that is part of a stage name or a surname even if it looks like a title. If stripping would leave nothing, keep the mention only if it is clearly a name.
+- `Mr. and Mrs. Elias Smith` is one person, `Elias Smith`.
 
-- **`entity`** is the fullest attested form: the one with the most name tokens (given names, initials, surname, generational suffix). A quoted nickname does not count. If that same form appears with different casing, prefer a capitalized occurrence that is actually written in the source. If no capitalized occurrence exists, keep the lowercase form exactly as written. Never create a capitalized form. If equally full forms still tie, use the one that appears first.
-- **`synonyms`** are the other spellings of that person. Do not include the entity string. Do not add aliases the source never writes. Emit name-forms first, then aliases. Name-forms are unique subsets, unique initialisms, and comma inversions. Aliases are explicit aliases and quoted nicknames. Within each group, keep first-appearance order. `Marcus Vance`, also called `"The Hound,"` then later `Vance` → `Vance;The Hound`.
-- Deduplicate case-insensitively. When duplicates differ only by case, keep a capitalized source occurrence if one exists; otherwise keep the first source casing.
-- Wrapping punctuation does not make a new spelling. `Ada`, `Ada.`, and `"Ada"` are one spelling; keep `Ada`. Periods inside initials are part of the spelling: `J.F.K.` and `JFK` are different.
-- An inverted comma-form (`Lovelace, Ada`) is a different spelling. It stays a synonym unless it is the fullest form chosen as `entity`.
+## Procedure
 
-Examples:
-
-- `ada lovelace` followed by `Ada Lovelace` → entity `Ada Lovelace`.
-- Only `ada lovelace` appears → entity `ada lovelace`.
-- `ada lovelace` and later `Ada` → entity `ada lovelace`, synonym `Ada`; the source never writes the full form as `Ada Lovelace`.
-
-### What may be removed from a name
-
-These are the only changes to an otherwise verbatim name:
-
-- Attached titles and role labels are removed and discarded. Generational suffixes stay on the entity: `Jr.`, `Sr.`, `II`, `III`, `IV`.
-- A trailing possessive `'s` or a trailing apostrophe used as a possessive. `Lovelace's` → `Lovelace`. `O'Brien's` → `O'Brien`. Keep apostrophes that belong to the name (`O'Brien`).
-- A trailing period that ends a sentence. Keep periods that belong to initials or to a suffix that stays on the name (`J.F.K.`, `Jr.`).
-- A quoted nickname, moved to `synonyms`.
-- Wrapping quotation marks around an entire name.
-
-`Sr.` is a generational suffix in `John Smith Sr.` and stays on the entity. `Sr.` is a courtesy title in `Sr. García` and is discarded.
-
-## Ignore titles
-
-Titles are context only. Never output them in `entity`, `synonyms`, or another column.
-
-Strip a token only when it functions as a title or role on that mention:
-
-- Before the name: `Dr. Martin Luther King Jr.`, `CEO Jane Smith`, `King Charles`, `Lord Byron`.
-- After the name, set off as a suffix or office: `Jane Smith, PhD`, `Jane Smith, CEO`. Known suffixes may be stripped without a comma: `PhD`, `M.D.`, `MD`, `Esq.`, `RN`.
-- In an appositive role: `Jane Smith, the CEO`, `Jane Smith, a mathematician`, `Jane Smith, director of research`.
-
-Do not strip a token that is part of the name:
-
-- Surname or given-name slot, including when the word is also a title word: `Stephen King`, `Martin Luther King Jr.` (`King` stays; `Jr.` stays).
-- A leading word that is part of a stage name or pseudonym when the text does not refer to the person by the remainder alone: `Lady Gaga`, `Sir Mix-a-Lot`.
-- If stripping would leave no name, keep the original mention when it is clearly a name (`Prince`), and skip the mention when it is only a role (`the CEO`).
-
-Illustrative title words, not a closed list: `Mr.`, `Mrs.`, `Ms.`, `Miss`, `Mx.`, `Dr.`, `Prof.`, `Professor`, `Sir`, `Dame`, `Rev.`, `Hon.`, `Lord`, `Lady`, `Capt.`, `Col.`, `Gen.`, `Adm.`, `Rep.`, `Sen.`, `Amb.`, `Fr.`, `Rabbi`, `Imam`, `Pope`, `King`, `Queen`, `Prince`, `CEO`, `President`, `Senator`, `Governor`, `Judge`, `Director`. Whether the token functions as part of the name or as a title wins over the list.
-
-## Output
-
-Read and follow `format-as-csv/SKILL.md` to print the rows. That skill owns delimiter, line endings, empty cells, quoting, and quote escaping. **Do not write the CSV to disk.**
-
-Column contract for that skill:
-
-- Header, exact and unquoted: `entity,synonyms`. Emit it even when there are no people.
-- `entity` is a required scalar. If it would be blank, do not emit the row.
-- `synonyms` is one cell. A person with no synonyms has an empty cell. Several names are joined with `;` and no spaces, name-forms before aliases. Quote that cell only when `format-as-csv/SKILL.md` requires it.
-- Keep every column. An empty `synonyms` is an empty last field: `Stephen King,`
-- Unknown optional fields are empty.
-- Emit rows in order of each person's first appearance.
+1. Mark credit lines (including the first and last lines of the text) and set those names aside.
+2. Read the whole text to the end. List every full name, taking the longest form for each person.
+3. Separate scanning pass: find given-name-only mentions, lowercase names (especially after relation words, `named`, `called`, `thanks`), surname-only mentions, speaker labels, and nicknames. For each, look for a listed full name that contains it as a token (any case), or that it is a nickname of. If exactly one does, it is that person: add nothing. If none does, it is a new person: add it as written. If several do, drop it.
+4. Drop handles, credits, organizations, venues, places, and ambiguous fragments.
+5. Final verification of every entry:
+   - Its words appear in the source as those exact adjacent words (ignoring case, removed titles, and comma inversion). A quoted nickname beside a surname is not adjacency. If the check fails, fix or delete the entry.
+   - Collision check, ignoring case: compare each entry with every other entry. If a one-word entry equals any word of a longer entry, delete the one-word entry. If two multi-word entries share a surname, keep both only when the source presents two different people; if one given name is the nickname of the other, keep only the formal one.
+   - It is not from a credit line.
+   - Recall: every lowercase name and every bare surname found in step 3 that has no fuller form is still in the list.
+6. Output one string per person, in order of first appearance.
 
 ## Worked example
 
-Source text:
+Text: `Prepared by: Mae Rindle, Hartwell Press. Dr. Tomas "Tom" Castellan met Lena Brandt at the Hartwell Auditorium. Tom said hi to his neighbor nico, and @lena_o answered. A clerk named wim took the form. Brandt, Lena left. Gus Hale Jr. arrived later; Hale waved. A rep from Orsen Labs said Perrin would call back. wim Aalders filed it, thanks wim.`
 
-```
-On March 12, 2024, Dr. Martin Luther King Jr. spoke in Washington. Stephen King signed books the same day. Robert "Bob" Smith arrived with Jane Smith, PhD, the CEO, and John Smith. Smith waved, and Bob waved back. The badge read "Smith, John". Mr. and Mrs. John Smith hosted Senators Warren and Booker. Lady Gaga performed. Lovelace's notes describe Ada Lovelace (also called Ada). Washington University sent no one. Marcus Vance, also called "The Hound," arrived after that. Vance left. She thanked the crew.
-```
+Output: `["Tomas Castellan","Lena Brandt","nico","wim Aalders","Gus Hale Jr.","Perrin"]`
 
-Required output, printed by `format-as-csv/SKILL.md` (each record ended by CRLF, including after the last row):
-
-```
-entity,synonyms
-Martin Luther King Jr.,
-Stephen King,
-Robert Smith,Bob
-Jane Smith,
-John Smith,"Smith, John"
-Warren,
-Booker,
-Lady Gaga,
-Ada Lovelace,Lovelace;Ada
-Marcus Vance,Vance;The Hound
-```
-
-`Dr.` is ignored and `Jr.` stays. `King` in both King names is a surname. `Bob` is the quoted nickname, then a later mention of the same person. Bare `Smith` matches three people, so it is dropped. `Smith, John` keeps its internal space and is a comma inversion of `John Smith`, not a new person. `Mrs.` names no one. `Senators`, `PhD`, `CEO`, and `a mathematician` are ignored. `Lady Gaga` stays intact. `Lovelace's` is the possessive of `Ada Lovelace`; `Ada` is an explicit alias, so the name-form `Lovelace` comes before it. `Vance` is a name-form and `The Hound` is an alias, so `Vance` comes first even though the nickname is written first. `Washington`, `Washington University`, `She`, and `the crew` are not people rows.
+- `Mae Rindle` is a credit.
+- `Tom` is the nickname of `Tomas Castellan`. It is one entry, never `Tom Castellan` and never a separate `Tom`.
+- `Hartwell Auditorium` is a venue, and `@lena_o` is a handle.
+- `nico` is a lowercase given-name-only person with no fuller form.
+- `wim` appears first alone and later as `wim Aalders`. That is one entry, the fuller form.
+- `Brandt, Lena` is `Lena Brandt`.
+- `Hale` merges into `Gus Hale Jr.`
+- `Perrin` is a lone surname with no fuller form, so it is a person.
 
 ## Empty input
 
-If the source contains no extractable people, emit the header only:
-
-```
-entity,synonyms
-```
-
-## Before replying
-
-Check silently, then print only the CSV:
-
-- The reply follows `format-as-csv/SKILL.md`. The header is exactly `entity,synonyms`.
-- One row per person, in order of first appearance. `entity` is the fullest attested name, not the first short form.
-- No synonym repeats `entity`. Synonyms list name-forms before aliases, and each group is in first-appearance order. No title, honorific, rank, office, profession, or role label is output.
-- Every name keeps source-attested casing. A capitalized source occurrence wins over its lowercase duplicate; lowercase stays lowercase when no capitalized occurrence exists.
-- No `UNKNOWN` or other sentinel. Empty optional fields are empty.
-- Ambiguous short forms and unnamed people are absent.
-- Full names were listed first, then the text was scanned for unique standalone surnames and supported nicknames before rows were compiled.
-- Journalists, byline authors, and media staff named only in credits, headers, or `By` lines are absent. Subjects of the events are present.
+If there are no people, return an empty list.
 
 ## Do not
 
-- Do not write the CSV to disk or wrap it in a markdown fence.
-- Do not output JSON or a Markdown table.
-- Do not extract places, organizations, events, or selectors.
-- Do not leave `entity` blank or repeat it in `synonyms`.
-- Do not add a row for a synonym, a pronoun, an unnamed role, or an ambiguous short form.
-- Do not expand a name the source never writes.
-- Do not output titles or role descriptions.
-- Do not fabricate people or aliases.
-- Do not extract journalists, byline authors, or media staff mentioned only in credits, headers, or `By` lines.
-- Do not favor observers or reporters over the people involved in the events.
+- Do not return aliases, nicknames, given names, or surnames as separate entries when they refer to an already listed person.
+- Do not return credited-only people, titles, handles, organizations, venues, places, or products.
+- Do not return objects or any shape other than a list of name strings.
+- Do not invent names or expand names the source never writes.
