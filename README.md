@@ -10,7 +10,7 @@ A collection of reusable skills for LLMs and agents. Each skill is a folder with
 | [`classifier`](classifier/SKILL.md) | Sorts text into zero or more categories from a set you provide (1 to 10 categories). Gives the reasoning for each match and returns strict JSON. |
 | [`translate`](translate/SKILL.md) | Translates text into a target language, keeping meaning, register, idiom, and local conventions. |
 | [`format-as-csv`](format-as-csv/SKILL.md) | Returns tabular data as strict RFC 4180 CSV with no other text. |
-| [`extract-people`](extract-people/SKILL.md) | Extracts people into CSV, one row per person, with name variants and titles. |
+| [`extract-people`](extract-people/SKILL.md) | Extracts people into CSV, one row per person, with source-attested name variants, aliases, and nicknames while ignoring titles. |
 | [`extract-organizations`](extract-organizations/SKILL.md) | Extracts organizations into CSV with the acronyms and aliases found in the source. |
 | [`extract-places`](extract-places/SKILL.md) | Extracts places into CSV with country, state, and city. |
 | [`extract-selectors`](extract-selectors/SKILL.md) | Extracts identifiers such as emails, phone numbers, IP addresses, URLs, usernames, and hashes into CSV, noting who or what each one belongs to. |

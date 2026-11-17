@@ -1,7 +1,9 @@
-entity,synonyms,title
-Elena Rostova,Rostova,Dr.;Chief Information Security Officer
-Marcus Vance,Vance;The Hound,Special Agent in Charge
-Viktor Korsakov,Korsakov;Viktor,Senior Systems Architect
-Catherine Thorne,Thorne,Senator;Chairwoman of the Senate Select Committee on Intelligence
-Arthur Pendelton,Pendelton,General
-Liam O'Connor,,
+entity,synonyms
+Elena Rostova,Rostova
+Marcus Vance,Vance;The Hound
+Viktor Korsakov,Korsakov;Viktor
+Catherine Thorne,Thorne
+Arthur Pendelton,Pendelton
+Liam O'Connor,
+Dana Mercer,
+riley quinn,
